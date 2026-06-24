@@ -15,43 +15,87 @@ pub const PROXY_PORT: u16 = 8787;
 #[derive(Default)]
 pub struct ProxyState(pub Mutex<Option<Child>>);
 
-/// Resolve the `headroom` executable. Preference order:
+fn push_if_file(candidates: &mut Vec<PathBuf>, path: PathBuf) {
+    if path.is_file() && !candidates.iter().any(|p| p == &path) {
+        candidates.push(path);
+    }
+}
+
+fn explicit_headroom_bin() -> Option<PathBuf> {
+    std::env::var("HEADROOM_BIN").ok().map(PathBuf::from)
+}
+
+fn sidecar_headroom_bin() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    Some(dir.join("headroom-proxy"))
+}
+
+fn installed_headroom_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        push_if_file(&mut candidates, home.join(".local/bin/headroom"));
+    }
+    push_if_file(&mut candidates, PathBuf::from("/opt/homebrew/bin/headroom"));
+    push_if_file(&mut candidates, PathBuf::from("/usr/local/bin/headroom"));
+
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in path.split(':') {
+            push_if_file(&mut candidates, PathBuf::from(dir).join("headroom"));
+        }
+    }
+
+    candidates
+}
+
+/// Resolve the `headroom` executable for long-lived proxy supervision.
+/// Preference order:
 ///   1. `HEADROOM_BIN` override
 ///   2. bundled PyInstaller sidecar next to our own executable (standalone app)
 ///   3. common install dirs, then the inherited PATH
-pub fn resolve_headroom() -> Option<PathBuf> {
-    if let Ok(explicit) = std::env::var("HEADROOM_BIN") {
-        let p = PathBuf::from(explicit);
-        if p.is_file() {
-            return Some(p);
-        }
+pub fn resolve_headroom_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(explicit) = explicit_headroom_bin() {
+        push_if_file(&mut candidates, explicit);
     }
 
     // Tauri copies `externalBin` next to the app executable, stripping the
     // target-triple suffix — so it lands as `headroom-proxy`.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let sidecar = dir.join("headroom-proxy");
-            if sidecar.is_file() {
-                return Some(sidecar);
-            }
-        }
+    if let Some(sidecar) = sidecar_headroom_bin() {
+        push_if_file(&mut candidates, sidecar);
     }
 
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Some(home) = dirs::home_dir() {
-        candidates.push(home.join(".local/bin/headroom"));
-    }
-    candidates.push(PathBuf::from("/opt/homebrew/bin/headroom"));
-    candidates.push(PathBuf::from("/usr/local/bin/headroom"));
-
-    if let Ok(path) = std::env::var("PATH") {
-        for dir in path.split(':') {
-            candidates.push(PathBuf::from(dir).join("headroom"));
-        }
+    for candidate in installed_headroom_candidates() {
+        push_if_file(&mut candidates, candidate);
     }
 
-    candidates.into_iter().find(|p| p.is_file())
+    candidates
+}
+
+/// Resolve `headroom` for short-lived CLI commands such as `doctor` and `init`.
+/// In `tauri dev`, the sidecar is a PyInstaller onefile binary in target/debug;
+/// spawning it every poll is much slower than using an installed CLI.
+pub fn resolve_headroom_cli_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(explicit) = explicit_headroom_bin() {
+        push_if_file(&mut candidates, explicit);
+    }
+
+    for candidate in installed_headroom_candidates() {
+        push_if_file(&mut candidates, candidate);
+    }
+
+    if let Some(sidecar) = sidecar_headroom_bin() {
+        push_if_file(&mut candidates, sidecar);
+    }
+
+    candidates
+}
+
+pub fn resolve_headroom() -> Option<PathBuf> {
+    resolve_headroom_candidates().into_iter().next()
 }
 
 #[tauri::command]

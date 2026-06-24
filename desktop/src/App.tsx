@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
@@ -19,24 +19,44 @@ type Doctor = {
   checks: Check[];
 };
 
+type DashboardMode = "inline" | "window";
+
 const STATUS_DOT: Record<string, string> = {
-  pass: "#34c759",
+  pass: "#30d158",
   warn: "#ff9f0a",
   fail: "#ff453a",
+};
+
+const CHECK_LABELS: Record<string, string> = {
+  version: "Version",
+  claude: "Claude",
+  codex: "Codex",
+  shell: "Shell env",
+  savings: "Savings",
+  budget: "Budget",
+  deployments: "Deployments",
 };
 
 function App() {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pinned, setPinned] = useState(false);
+  const [dashboardMode, setDashboardMode] = useState<DashboardMode>("inline");
+  const refreshInFlight = useRef(false);
 
   const refresh = useCallback(async () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+
     try {
       const result = await invoke<Doctor>("doctor_status");
       setDoctor(result);
       setError(null);
     } catch (e) {
       setError(String(e));
+    } finally {
+      refreshInFlight.current = false;
     }
   }, []);
 
@@ -51,6 +71,15 @@ function App() {
   const clientChecks = doctor?.checks.filter((c) => c.name !== "proxy") ?? [];
   const intercepting =
     clientChecks.length > 0 && clientChecks.every((c) => c.status === "pass");
+  const healthLabel = proxyUp ? "Healthy" : "Stopped";
+  const updatedAt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date()),
+    [doctor],
+  );
 
   const act = async (label: string, cmd: string) => {
     setBusy(label);
@@ -65,27 +94,78 @@ function App() {
     }
   };
 
+  const togglePinned = async () => {
+    const next = !pinned;
+    setPinned(next);
+    setError(null);
+
+    try {
+      const confirmed = await invoke<boolean>("set_pinned", { pinned: next });
+      setPinned(confirmed);
+    } catch (e) {
+      setPinned(!next);
+      setError(String(e));
+    }
+  };
+
+  const showDashboardWindow = async () => {
+    setDashboardMode("window");
+    setError(null);
+
+    try {
+      await invoke("open_dashboard_window");
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
   return (
     <main className="app">
-      <header className="header">
-        <span className="title">Headroom</span>
-        <span className="version">
-          {doctor?.installed_version ? `v${doctor.installed_version}` : "—"}
-        </span>
-      </header>
+      <div className="popover-arrow" />
 
-      {error && <div className="error">{error}</div>}
-
-      <section className="card">
-        <div className="row">
-          <span className="row-label">
+      <header className="topbar">
+        <div>
+          <div className="brand-line">
+            <span className="brand">Headroom</span>
+            <span className="version">
+              {doctor?.installed_version ? `v${doctor.installed_version}` : "v--"}
+            </span>
+          </div>
+          <div className="subline">
             <span
               className="dot"
               style={{ background: proxyUp ? STATUS_DOT.pass : STATUS_DOT.fail }}
             />
-            Proxy
-          </span>
+            {healthLabel}
+            <span className="muted">Updated {updatedAt}</span>
+          </div>
+        </div>
+        <button
+          className={pinned ? "icon-button active" : "icon-button"}
+          onClick={togglePinned}
+          title={pinned ? "Disable always on top" : "Keep window on top"}
+          aria-pressed={pinned}
+        >
+          Pin
+        </button>
+      </header>
+
+      {error && <div className="error">{error}</div>}
+
+      <section className="panel control-panel">
+        <div className="row primary-row">
+          <div>
+            <span className="row-label">
+              <span
+                className="dot"
+                style={{ background: proxyUp ? STATUS_DOT.pass : STATUS_DOT.fail }}
+              />
+              Proxy
+            </span>
+            {proxyCheck && <p className="summary">{proxyCheck.summary}</p>}
+          </div>
           <button
+            className="action-button"
             disabled={busy !== null}
             onClick={() =>
               act(
@@ -95,20 +175,17 @@ function App() {
             }
           >
             {busy === "start" || busy === "stop"
-              ? "…"
+              ? "..."
               : proxyUp
                 ? "Stop"
                 : "Start"}
           </button>
         </div>
-        {proxyCheck && <p className="summary">{proxyCheck.summary}</p>}
-      </section>
 
-      <section className="card">
-        <div className="row">
+        <div className="row compact-row">
           <span className="row-label">Intercept all requests</span>
           <button
-            className={intercepting ? "toggle on" : "toggle"}
+            className={intercepting ? "switch on" : "switch"}
             disabled={busy !== null || !proxyUp}
             onClick={() =>
               act(
@@ -118,29 +195,74 @@ function App() {
             }
           >
             {busy === "on" || busy === "off"
-              ? "…"
+              ? "..."
               : intercepting
                 ? "On"
                 : "Off"}
           </button>
         </div>
-        {clientChecks.map((c) => (
-          <div key={c.name} className="client">
-            <span
-              className="dot"
-              style={{ background: STATUS_DOT[c.status] ?? "#8e8e93" }}
-            />
-            <span className="client-name">{c.name}</span>
-            <span className="client-summary">{c.hint ?? c.summary}</span>
-          </div>
-        ))}
       </section>
 
-      <section className="dashboard">
-        {proxyUp ? (
-          <iframe title="dashboard" src={DASHBOARD_URL} />
+      <section className="panel checks-panel">
+        <div className="section-heading">
+          <span>Doctor</span>
+          <span className="muted">{clientChecks.length} checks</span>
+        </div>
+        <div className="checks">
+          {clientChecks.map((c) => (
+            <div key={c.name} className="check-row">
+              <span
+                className="dot"
+                style={{ background: STATUS_DOT[c.status] ?? "#8e8e93" }}
+              />
+              <span className="check-name">{CHECK_LABELS[c.name] ?? c.name}</span>
+              <span className="check-summary">{c.hint ?? c.summary}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel dashboard-panel">
+        <div className="section-heading">
+          <span>Dashboard</span>
+          <div className="segmented">
+            <button
+              className={dashboardMode === "inline" ? "selected" : ""}
+              onClick={() => setDashboardMode("inline")}
+            >
+              Inline
+            </button>
+            <button
+              className={dashboardMode === "window" ? "selected" : ""}
+              onClick={showDashboardWindow}
+            >
+              Window
+            </button>
+          </div>
+        </div>
+
+        {dashboardMode === "inline" ? (
+          <div className="dashboard-frame">
+            {proxyUp ? (
+              <iframe title="dashboard" src={DASHBOARD_URL} />
+            ) : (
+              <div className="placeholder">Start proxy to preview dashboard</div>
+            )}
+          </div>
         ) : (
-          <div className="placeholder">Start the proxy to view the dashboard</div>
+          <div className="window-mode">
+            <div>
+              <strong>Dashboard opened separately</strong>
+              <span>Move and resize it like a normal macOS window.</span>
+            </div>
+            <button
+              className="action-button"
+              disabled={!proxyUp}
+              onClick={showDashboardWindow}
+            >
+              Show
+            </button>
+          </div>
         )}
       </section>
     </main>

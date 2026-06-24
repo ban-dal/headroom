@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::proxy::resolve_headroom;
+use crate::proxy::resolve_headroom_cli_candidates;
 
 const CLAUDE_HOOK_MARKER: &str = "headroom-init-claude";
 const CODEX_PROVIDER_START: &str = "# --- Headroom init provider ---";
@@ -21,18 +21,33 @@ const CODEX_FEATURE_START: &str = "# --- Headroom init features ---";
 const CODEX_FEATURE_END: &str = "# --- end Headroom init features ---";
 
 fn run_init(client: &str) -> Result<String, String> {
-    let bin = resolve_headroom().ok_or_else(|| "headroom binary not found".to_string())?;
-    let out = Command::new(&bin)
-        .args(["init", client])
-        .output()
-        .map_err(|e| format!("failed to run `headroom init {client}`: {e}"))?;
-    if !out.status.success() {
-        return Err(format!(
-            "`headroom init {client}` failed: {}",
-            String::from_utf8_lossy(&out.stderr)
-        ));
+    let candidates = resolve_headroom_cli_candidates();
+    if candidates.is_empty() {
+        return Err("headroom binary not found".to_string());
     }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+
+    let mut errors = Vec::new();
+    for bin in candidates {
+        match Command::new(&bin).args(["init", client]).output() {
+            Ok(out) if out.status.success() => {
+                return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
+            }
+            Ok(out) => {
+                errors.push(format!(
+                    "{}: exit status {}; stderr: {}",
+                    bin.display(),
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr).trim()
+                ));
+            }
+            Err(e) => errors.push(format!("{}: {e}", bin.display())),
+        }
+    }
+
+    Err(format!(
+        "failed to run `headroom init {client}` with any candidate:\n{}",
+        errors.join("\n")
+    ))
 }
 
 #[tauri::command]

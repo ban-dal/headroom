@@ -2,6 +2,8 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   color: #f5f5f7;
   font-size: 13px;
+  font-synthesis: none;
+  letter-spacing: 0;
 }
 
 * {
@@ -11,87 +13,196 @@
 
 body {
   background: transparent;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  padding: 12px;
-  gap: 10px;
-  background: rgba(28, 28, 30, 0.96);
-  border-radius: 12px;
   overflow: hidden;
 }
 
-.header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+button {
+  border: 0;
+  font: inherit;
 }
 
-.title {
-  font-weight: 600;
+.app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  gap: 8px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(50, 50, 54, 0.98), rgba(28, 28, 30, 0.98)),
+    rgba(28, 28, 30, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
+}
+
+.popover-arrow {
+  position: absolute;
+  top: -5px;
+  left: calc(50% - 7px);
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(50, 50, 54, 0.98);
+}
+
+.topbar,
+.row,
+.section-heading,
+.window-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.topbar {
+  position: relative;
+  z-index: 1;
+  padding-bottom: 3px;
+}
+
+.brand-line,
+.subline,
+.row-label,
+.check-row {
+  display: flex;
+  align-items: center;
+}
+
+.brand-line {
+  gap: 8px;
+}
+
+.brand {
   font-size: 15px;
+  font-weight: 650;
+}
+
+.version,
+.muted,
+.summary,
+.check-summary,
+.window-mode span {
+  color: #a1a1aa;
 }
 
 .version {
-  color: #8e8e93;
+  font-family: "SF Mono", ui-monospace, monospace;
   font-size: 11px;
 }
 
-.error {
-  background: rgba(255, 69, 58, 0.15);
-  color: #ff8a80;
-  padding: 6px 8px;
-  border-radius: 6px;
+.subline {
+  gap: 6px;
+  margin-top: 4px;
+  color: #d8d8df;
   font-size: 11px;
-  word-break: break-word;
 }
 
-.card {
-  background: rgba(255, 255, 255, 0.06);
+.subline .muted::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin: 0 7px 2px;
+  border-radius: 999px;
+  background: #6f6f78;
+}
+
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  padding: 10px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.control-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.primary-row,
+.compact-row {
+  padding: 10px;
+}
+
+.compact-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .row-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
+  gap: 7px;
+  color: #f5f5f7;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 7px;
+  height: 7px;
   flex: none;
+  border-radius: 999px;
+  box-shadow: 0 0 12px currentColor;
 }
 
 .summary {
-  color: #8e8e93;
+  max-width: 280px;
+  margin-top: 4px;
+  overflow: hidden;
   font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-button {
-  border: none;
-  border-radius: 6px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
+.error {
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 69, 58, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 69, 58, 0.13);
+  color: #ffb4ae;
+  font-size: 11px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.icon-button,
+.action-button,
+.switch,
+.segmented button {
+  min-height: 28px;
+  border-radius: 7px;
   color: #f5f5f7;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
+}
+
+.icon-button {
+  min-width: 46px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.icon-button.active {
+  color: #071014;
+  background: #22d3ee;
+}
+
+.action-button,
+.switch {
+  min-width: 58px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.switch.on {
+  color: #071014;
+  background: #30d158;
 }
 
 button:disabled {
@@ -99,48 +210,126 @@ button:disabled {
   cursor: default;
 }
 
-.toggle.on {
-  background: #34c759;
-  color: #fff;
+.checks-panel {
+  padding: 10px;
 }
 
-.client {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.section-heading {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.section-heading .muted {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.checks {
+  display: grid;
+  gap: 5px;
+}
+
+.check-row {
+  min-height: 20px;
+  gap: 7px;
   font-size: 11px;
 }
 
-.client-name {
-  font-weight: 500;
-  min-width: 52px;
+.check-name {
+  width: 76px;
+  flex: none;
+  color: #f4f4f5;
+  font-weight: 600;
 }
 
-.client-summary {
-  color: #8e8e93;
+.check-summary {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dashboard {
+.dashboard-panel {
+  display: flex;
+  min-height: 0;
   flex: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #000;
+  flex-direction: column;
+  padding: 10px;
 }
 
-.dashboard iframe {
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: 146px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.segmented button {
+  min-height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  color: #a1a1aa;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.segmented button.selected {
+  color: #071014;
+  background: #22d3ee;
+}
+
+.dashboard-frame {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: #0f0f10;
+}
+
+.dashboard-frame iframe {
   width: 100%;
   height: 100%;
-  border: none;
+  border: 0;
+  background: #0f0f10;
+}
+
+.placeholder,
+.window-mode {
+  height: 100%;
 }
 
 .placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: #8e8e93;
+  color: #a1a1aa;
   font-size: 12px;
+}
+
+.window-mode {
+  min-height: 118px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.window-mode div {
+  display: grid;
+  gap: 4px;
+}
+
+.window-mode strong {
+  font-size: 12px;
+}
+
+.window-mode span {
+  max-width: 220px;
+  font-size: 11px;
+  line-height: 1.35;
 }
