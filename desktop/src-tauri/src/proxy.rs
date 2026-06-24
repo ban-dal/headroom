@@ -15,13 +15,26 @@ pub const PROXY_PORT: u16 = 8787;
 #[derive(Default)]
 pub struct ProxyState(pub Mutex<Option<Child>>);
 
-/// Resolve the `headroom` executable, honoring `HEADROOM_BIN` then probing
-/// common install dirs and finally the inherited PATH.
+/// Resolve the `headroom` executable. Preference order:
+///   1. `HEADROOM_BIN` override
+///   2. bundled PyInstaller sidecar next to our own executable (standalone app)
+///   3. common install dirs, then the inherited PATH
 pub fn resolve_headroom() -> Option<PathBuf> {
     if let Ok(explicit) = std::env::var("HEADROOM_BIN") {
         let p = PathBuf::from(explicit);
         if p.is_file() {
             return Some(p);
+        }
+    }
+
+    // Tauri copies `externalBin` next to the app executable, stripping the
+    // target-triple suffix — so it lands as `headroom-proxy`.
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let sidecar = dir.join("headroom-proxy");
+            if sidecar.is_file() {
+                return Some(sidecar);
+            }
         }
     }
 

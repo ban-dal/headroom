@@ -42,8 +42,13 @@ pub fn run() {
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &quit])?;
 
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!(
+                "../icons/tray/tray@2x.png"
+            ))?;
+
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
+                .icon_as_template(true)
                 .tooltip("Headroom")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
