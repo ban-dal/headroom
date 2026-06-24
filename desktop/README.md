@@ -60,3 +60,22 @@ pnpm tauri dev
 ./scripts/build-proxy.sh
 pnpm tauri build
 ```
+
+Produces `src-tauri/target/release/bundle/macos/Headroom.app`.
+
+## Code signing (ad-hoc, free)
+
+`tauri.conf.json` sets `bundle.macOS.signingIdentity: "-"`, so the build is
+**ad-hoc signed** — no Apple Developer account or `$99/yr` program required.
+This keeps the app stable to run locally (verified with
+`codesign --verify --deep --strict`).
+
+Ad-hoc signing is **not** notarized, so on *another* Mac Gatekeeper still
+quarantines it. The recipient clears it once:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Headroom.app
+```
+
+Distributing to the public without that step needs a paid Developer ID
+certificate + Apple notarization.
